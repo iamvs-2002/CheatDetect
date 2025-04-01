@@ -26,6 +26,7 @@ public class DetectionManager {
     // Detectors
     private ActiveWindowDetector activeWindowDetector;
     private ClipboardMonitor clipboardMonitor;
+    private BrowserMonitor browserMonitor;
     private DeviceSwitchDetector deviceSwitchDetector;
     private ProcessMonitor processMonitor;
     private ScreenShareDetector screenShareDetector;
@@ -61,6 +62,12 @@ public class DetectionManager {
             activeWindowDetector = new ActiveWindowDetector(config, platformImpl);
             activeWindowDetector.registerEventListener(this::forwardEvent);
             Logger.info("Active window detector initialized");
+        }
+
+        if (config.isBrowserMonitoringEnabled()) {
+            browserMonitor = new BrowserMonitor(config, platformImpl);
+            browserMonitor.registerEventListener(this::forwardEvent);
+            Logger.info("Browser monitor initialized");
         }
 
         if (config.isClipboardMonitoringEnabled()) {
@@ -119,6 +126,10 @@ public class DetectionManager {
             clipboardMonitor.startMonitoring();
         }
 
+        if (browserMonitor != null) {
+            browserMonitor.startMonitoring();
+        }
+
         if (deviceSwitchDetector != null) {
             scheduledExecutor.scheduleAtFixedRate(
                     deviceSwitchDetector::detect,
@@ -175,6 +186,10 @@ public class DetectionManager {
 
         if (clipboardMonitor != null) {
             clipboardMonitor.stopMonitoring();
+        }
+
+        if (browserMonitor != null) {
+            browserMonitor.stopMonitoring();
         }
 
         scheduledExecutor.shutdown();

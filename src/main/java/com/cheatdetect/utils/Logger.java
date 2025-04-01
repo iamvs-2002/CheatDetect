@@ -5,13 +5,15 @@ import org.slf4j.LoggerFactory;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-/**
- * Logging utility class for the CheatDetect library.
- */
 public class Logger {
     private static final org.slf4j.Logger LOG = LoggerFactory.getLogger("CheatDetect");
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
     private static boolean detailedLoggingEnabled = false;
+    private static CustomLogger customLogger = null;
+
+    public static void setCustomLogger(CustomLogger logger) {
+        customLogger = logger;
+    }
 
     /**
      * Logs an info message.
@@ -21,6 +23,9 @@ public class Logger {
     public static void info(String message) {
         LOG.info(message);
         logToConsole("INFO", message);
+        if (customLogger != null) {
+            customLogger.log("INFO", message);
+        }
     }
 
     /**
@@ -31,6 +36,9 @@ public class Logger {
     public static void warn(String message) {
         LOG.warn(message);
         logToConsole("WARN", message);
+        if (customLogger != null) {
+            customLogger.log("WARN", message);
+        }
     }
 
     /**
@@ -41,6 +49,9 @@ public class Logger {
     public static void error(String message) {
         LOG.error(message);
         logToConsole("ERROR", message);
+        if (customLogger != null) {
+            customLogger.log("ERROR", message);
+        }
     }
 
     /**
@@ -52,6 +63,9 @@ public class Logger {
     public static void error(String message, Throwable e) {
         LOG.error(message, e);
         logToConsole("ERROR", message + ": " + e.getMessage());
+        if (customLogger != null) {
+            customLogger.log("ERROR", message + ": " + e.getMessage());
+        }
     }
 
     /**
@@ -64,6 +78,9 @@ public class Logger {
         if (detailedLoggingEnabled) {
             LOG.debug(message);
             logToConsole("DEBUG", message);
+            if (customLogger != null) {
+                customLogger.log("DEBUG", message);
+            }
         }
     }
 

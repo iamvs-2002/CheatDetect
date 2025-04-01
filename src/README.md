@@ -48,6 +48,7 @@ public class Demo {
         Configuration config = new Configuration.Builder()
             .enableProcessMonitoring(true)
             .enableClipboardMonitoring(true)
+            .enableBrowserMonitoring(true)
             .enableLeetCodeDetection(true)
             .enableScreenShareDetection(true)
             .enableVideoCallDetection(true)

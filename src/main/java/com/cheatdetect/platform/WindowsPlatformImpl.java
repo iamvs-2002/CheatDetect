@@ -9,8 +9,12 @@ import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.DataFlavor;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.NetworkInterface;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -74,54 +78,93 @@ public class WindowsPlatformImpl implements PlatformInterface {
         List<String> trayApps = new ArrayList<>();
 
         try {
-            // On Windows, we identify system tray apps by looking for hidden windows
-            WinUser.WNDENUMPROC enumProc = (hwnd, param) -> {
-                if (user32.IsWindowVisible(hwnd)) {
-                    return true;
+            // Get running processes that might be in the system tray
+            Process process = Runtime.getRuntime().exec("tasklist /fo csv /nh");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                // Simple check for background apps
+                if (line.contains("tray") || line.contains("systray") ||
+                        line.contains("notify") || line.contains("background")) {
+                    trayApps.add(line);
                 }
+            }
+            reader.close();
 
-                int length = user32.GetWindowTextLength(hwnd) + 1;
-                char[] buffer = new char[length];
-                user32.GetWindowText(hwnd, buffer, length);
-                String title = Native.toString(buffer);
+            // For a more comprehensive approach, check shell_trayWnd window
+            // This would require JNA and would be more complex
 
-                if (!title.isEmpty()) {
-                    IntByReference processId = new IntByReference();
-                    user32.GetWindowThreadProcessId(hwnd, processId);
+            // Add common system tray apps that might not be caught
+            checkAndAddCommonTrayApp(trayApps, "Discord.exe");
+            checkAndAddCommonTrayApp(trayApps, "Slack.exe");
+            checkAndAddCommonTrayApp(trayApps, "Teams.exe");
+            checkAndAddCommonTrayApp(trayApps, "OneDrive.exe");
+            checkAndAddCommonTrayApp(trayApps, "Dropbox.exe");
 
-                    WinNT.HANDLE process = kernel32.OpenProcess(
-                            Kernel32.PROCESS_QUERY_INFORMATION | Kernel32.PROCESS_VM_READ,
-                            false,
-                            processId.getValue());
-
-                    if (process != null) {
-                        char[] moduleName = new char[1024];
-                        Psapi.INSTANCE.GetModuleFileNameExW(process, null, moduleName, moduleName.length);
-                        String processName = Native.toString(moduleName);
-
-                        if (!processName.isEmpty()) {
-                            // Extract process name from full path
-                            int lastBackslashIndex = processName.lastIndexOf('\\');
-                            if (lastBackslashIndex != -1) {
-                                processName = processName.substring(lastBackslashIndex + 1);
-                            }
-
-                            trayApps.add(processName);
-                        }
-
-                        kernel32.CloseHandle(process);
-                    }
-                }
-
-                return true;
-            };
-
-            user32.EnumWindows(enumProc, null);
         } catch (Exception e) {
             Logger.error("Failed to get system tray applications", e);
         }
 
         return trayApps;
+    }
+
+    private void checkAndAddCommonTrayApp(List<String> trayApps, String appName) {
+        try {
+            Process process = Runtime.getRuntime().exec("tasklist /fi \"imagename eq " + appName + "\"");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.contains(appName)) {
+                    trayApps.add(appName);
+                    break;
+                }
+            }
+            reader.close();
+        } catch (Exception e) {
+            // Ignore errors for this helper method
+        }
+    }
+
+    @Override
+    public boolean isCameraActive() {
+        try {
+            // Check if common video apps are running
+            for (String videoApp : new String[]{"zoom", "teams", "webex", "skype", "meet", "chrome"}) {
+                Process process = Runtime.getRuntime().exec("tasklist /fi \"imagename eq " +
+                        videoApp + ".exe\"");
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+                String line;
+                boolean found = false;
+                while ((line = reader.readLine()) != null) {
+                    if (line.contains(videoApp)) {
+                        found = true;
+                        break;
+                    }
+                }
+                reader.close();
+
+                if (found) {
+                    // For Chrome, do an additional check for Google Meet
+                    if (videoApp.equals("chrome")) {
+                        String activeWindow = getActiveWindowTitle().toLowerCase();
+                        if (activeWindow.contains("meet.google.com") || activeWindow.contains("google meet")) {
+                            return true;
+                        }
+                    } else {
+                        return true;
+                    }
+                }
+            }
+
+            // Additional checks for DirectShow/media foundation usage would require JNA
+            return false;
+        } catch (Exception e) {
+            Logger.error("Failed to check camera status", e);
+            return false;
+        }
     }
 
     @Override
@@ -139,39 +182,6 @@ public class WindowsPlatformImpl implements PlatformInterface {
         }
 
         return "";
-    }
-
-    @Override
-    public boolean isCameraActive() {
-        try {
-            // Check for camera usage by looking for specific processes
-            List<String> processes = getRunningProcesses();
-            for (String process : processes) {
-                String lowerCase = process.toLowerCase();
-                if (lowerCase.contains("webcam") ||
-                        lowerCase.contains("camera") ||
-                        isCameraProcessName(lowerCase)) {
-                    return true;
-                }
-            }
-
-            // Alternative method: Try to detect camera usage via DirectShow
-            // This requires more complex JNA bindings and might not be reliable
-
-            return false;
-        } catch (Exception e) {
-            Logger.error("Failed to check camera status", e);
-            return false;
-        }
-    }
-
-    private boolean isCameraProcessName(String processName) {
-        return processName.equals("mswebcam.exe") ||
-                processName.equals("webexmta.exe") ||
-                processName.equals("zoom.exe") ||
-                processName.equals("teams.exe") ||
-                processName.equals("skype.exe") ||
-                processName.equals("webex.exe");
     }
 
     @Override
@@ -210,23 +220,63 @@ public class WindowsPlatformImpl implements PlatformInterface {
     @Override
     public boolean isScreenSharing() {
         try {
-            // Check for screen sharing by looking for specific processes
-            // This is a simple heuristic; more accurate detection would require hooking into Windows APIs
-            List<String> processes = getRunningProcesses();
-            for (String process : processes) {
-                String lowerCase = process.toLowerCase();
-                if (lowerCase.contains("screenshare") ||
-                        lowerCase.contains("screencast") ||
-                        isScreenSharingProcessName(lowerCase)) {
+            // Check for screen sharing by looking for specific processes and window titles
+            String activeWindow = getActiveWindowTitle().toLowerCase();
+            if (activeWindow.contains("sharing") || activeWindow.contains("present") ||
+                    activeWindow.contains("screen")) {
+                return true;
+            }
+
+            // Look for DWM processes with screen sharing
+            Process process = Runtime.getRuntime().exec(
+                    "tasklist /fi \"imagename eq dwm.exe\" /v");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.toLowerCase().contains("screen sharing") ||
+                        line.toLowerCase().contains("presenting")) {
+                    reader.close();
                     return true;
                 }
             }
+            reader.close();
 
-            return false;
+            // Check Window classes that might indicate screen sharing
+            return checkScreenSharingWindows();
         } catch (Exception e) {
             Logger.error("Failed to check screen sharing status", e);
             return false;
         }
+    }
+
+    private boolean checkScreenSharingWindows() {
+        // This would ideally use JNA to check for specific window classes
+        // that indicate screen sharing
+
+        // For Google Meet specifically, check for processes
+        try {
+            Process process = Runtime.getRuntime().exec("tasklist /fi \"imagename eq chrome.exe\" /v");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.toLowerCase().contains("meet.google.com")) {
+                    // Now check if this Chrome instance is likely screen sharing
+                    String activeWindow = getActiveWindowTitle().toLowerCase();
+                    if (activeWindow.contains("meet") &&
+                            (activeWindow.contains("presenting") || activeWindow.contains("you are presenting"))) {
+                        reader.close();
+                        return true;
+                    }
+                }
+            }
+            reader.close();
+        } catch (Exception e) {
+            // Ignore errors in this additional check
+        }
+
+        return false;
     }
 
     private boolean isScreenSharingProcessName(String processName) {
@@ -309,25 +359,75 @@ public class WindowsPlatformImpl implements PlatformInterface {
     @Override
     public String getDeviceIdentifier() {
         try {
-            // Get Windows-specific device ID using WMI
-            Process process = Runtime.getRuntime().exec(
-                    "wmic csproduct get UUID");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            // Try primary method using WMI
+            try {
+                Process process = Runtime.getRuntime().exec("wmic csproduct get UUID");
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
 
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (!line.contains("UUID")) {
-                    line = line.trim();
-                    if (!line.isEmpty()) {
-                        return line;
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (!line.contains("UUID")) {
+                        line = line.trim();
+                        if (!line.isEmpty()) {
+                            reader.close();
+                            return line;
+                        }
                     }
                 }
+                reader.close();
+            } catch (IOException e) {
+                // WMIC command failed, try alternative method
+                Logger.debug("WMIC command failed, trying alternative method: " + e.getMessage());
             }
 
+            // Alternative method using PowerShell
+            Process process = Runtime.getRuntime().exec(
+                    new String[] {
+                            "powershell.exe",
+                            "-Command",
+                            "(Get-CimInstance -Class Win32_ComputerSystemProduct).UUID"
+                    });
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line = reader.readLine();
             reader.close();
+
+            if (line != null && !line.isEmpty()) {
+                return line.trim();
+            }
+
+            // If both methods fail, fall back to a combination of computer name and user name
+            String computerName = System.getenv("COMPUTERNAME");
+            String userName = System.getProperty("user.name");
+
+            if (computerName != null && userName != null) {
+                return calculateSHA256(computerName + "-" + userName);
+            }
+
             return "";
         } catch (Exception e) {
             Logger.error("Failed to get device identifier", e);
+            return "";
+        }
+    }
+
+    private String calculateSHA256(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(input.getBytes(StandardCharsets.UTF_8));
+
+            StringBuilder hexString = new StringBuilder();
+            for (byte hashByte : hashBytes) {
+                String hex = Integer.toHexString(0xff & hashByte);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            Logger.error("SHA-256 algorithm not available", e);
             return "";
         }
     }

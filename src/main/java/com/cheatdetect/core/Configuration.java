@@ -11,6 +11,7 @@ import java.util.List;
 public class Configuration {
     private final boolean processMonitoringEnabled;
     private final boolean clipboardMonitoringEnabled;
+    private final boolean browserMonitoringEnabled;
     private final boolean leetCodeDetectionEnabled;
     private final boolean screenShareDetectionEnabled;
     private final boolean videoCallDetectionEnabled;
@@ -25,6 +26,7 @@ public class Configuration {
     private Configuration(Builder builder) {
         this.processMonitoringEnabled = builder.processMonitoringEnabled;
         this.clipboardMonitoringEnabled = builder.clipboardMonitoringEnabled;
+        this.browserMonitoringEnabled = builder.browserMonitoringEnabled;
         this.leetCodeDetectionEnabled = builder.leetCodeDetectionEnabled;
         this.screenShareDetectionEnabled = builder.screenShareDetectionEnabled;
         this.videoCallDetectionEnabled = builder.videoCallDetectionEnabled;
@@ -43,6 +45,10 @@ public class Configuration {
 
     public boolean isClipboardMonitoringEnabled() {
         return clipboardMonitoringEnabled;
+    }
+
+    public boolean isBrowserMonitoringEnabled() {
+        return browserMonitoringEnabled;
     }
 
     public boolean isLeetCodeDetectionEnabled() {
@@ -91,6 +97,7 @@ public class Configuration {
     public static class Builder {
         private boolean processMonitoringEnabled = true;
         private boolean clipboardMonitoringEnabled = true;
+        private boolean browserMonitoringEnabled = true;
         private boolean leetCodeDetectionEnabled = true;
         private boolean screenShareDetectionEnabled = true;
         private boolean videoCallDetectionEnabled = true;
@@ -136,6 +143,11 @@ public class Configuration {
 
         public Builder enableClipboardMonitoring(boolean enabled) {
             this.clipboardMonitoringEnabled = enabled;
+            return this;
+        }
+
+        public Builder enableBrowserMonitoring(boolean enabled) {
+            this.browserMonitoringEnabled = enabled;
             return this;
         }
 
