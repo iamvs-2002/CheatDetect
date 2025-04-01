@@ -158,10 +158,6 @@ Configuration config = new Configuration.Builder()
     .build();
 ```
 
-## API Documentation
-
-For complete API documentation, see the [JavaDoc](https://cheatdetect.github.io/docs).
-
 ## Testing UI
 
 A testing UI is included to help verify CheatDetect functionality:
@@ -194,7 +190,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## Sample
+## Sample Test
 ![image](https://github.com/user-attachments/assets/3807d688-ab18-4742-94a7-e16bb9de42b9)
 
 ## License
