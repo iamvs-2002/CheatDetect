@@ -11,6 +11,8 @@ A lightweight, open-source Java library designed to detect cheating in coding in
 - **Process Monitoring**: Track running applications for unauthorized tools
 - **Clipboard Monitoring**: Identify copy-paste activity from external sources
 - **Multi-Device Detection**: Detect device switching during interviews
+- **Browser Monitoring**: Track multiple browsers and excessive tab usage
+- **AI Tool Detection**: Identify usage of AI assistants during interviews
 
 ## Requirements
 
@@ -37,6 +39,8 @@ implementation 'com.cheatdetect:cheatdetect:1.0.0'
 
 ## Quick Start
 
+Using the core library directly:
+
 ```java
 import com.cheatdetect.core.CheatDetect;
 import com.cheatdetect.core.Configuration;
@@ -53,6 +57,7 @@ public class Demo {
             .enableVideoCallDetection(true)
             .enableSystemTrayMonitoring(true)
             .enableDeviceSwitchDetection(true)
+            .enableBrowserMonitoring(true)
             .build();
             
         // Initialize CheatDetect
@@ -77,6 +82,44 @@ public class Demo {
 }
 ```
 
+Alternatively, using the API for easier integration:
+
+```java
+import com.cheatdetect.api.CheatDetectAPI;
+import com.cheatdetect.core.Configuration;
+import com.cheatdetect.api.AlertCallback;
+
+public class ApiDemo {
+    public static void main(String[] args) {
+        // Configure CheatDetect
+        Configuration config = new Configuration.Builder()
+            .enableProcessMonitoring(true)
+            .enableClipboardMonitoring(true)
+            .enableLeetCodeDetection(true)
+            .enableBrowserMonitoring(true)
+            .setScanInterval(2000) // Check every 2 seconds
+            .build();
+            
+        // Create an instance
+        String instanceId = CheatDetectAPI.createInstance(config);
+        
+        // Register alert callback
+        CheatDetectAPI.registerAlertCallback(instanceId, (alertType, details) -> {
+            System.out.println("ALERT: " + alertType + " - " + details);
+        });
+        
+        // Start monitoring
+        CheatDetectAPI.startMonitoring(instanceId);
+        
+        // ... Interview session ...
+        
+        // Stop monitoring
+        CheatDetectAPI.stopMonitoring(instanceId);
+        CheatDetectAPI.releaseInstance(instanceId);
+    }
+}
+```
+
 ## Customization
 
 CheatDetect is designed to be highly customizable. You can:
@@ -85,10 +128,61 @@ CheatDetect is designed to be highly customizable. You can:
 - Define custom detection rules
 - Configure logging level and output
 - Add custom alert handlers
+- Set scan intervals to balance performance and detection speed
+
+### Configuration Options
+
+```java
+Configuration config = new Configuration.Builder()
+    // Enable/disable specific detectors
+    .enableProcessMonitoring(true)
+    .enableClipboardMonitoring(true)
+    .enableLeetCodeDetection(true)
+    .enableScreenShareDetection(true)
+    .enableVideoCallDetection(true)
+    .enableSystemTrayMonitoring(true)
+    .enableDeviceSwitchDetection(true)
+    .enableBrowserMonitoring(true)
+    
+    // Set scanning frequency
+    .setScanInterval(2000) // milliseconds
+    
+    // Configure detailed logging
+    .enableDetailedLogging(true)
+    
+    // Add custom items to monitor
+    .addSuspiciousProcess("chatgpt.exe")
+    .addPlatformIdentifier("codingplatform.com")
+    .addVideoCallApplication("customvideoapp.exe")
+    
+    .build();
+```
 
 ## API Documentation
 
 For complete API documentation, see the [JavaDoc](https://cheatdetect.github.io/docs).
+
+## Testing UI
+
+A testing UI is included to help verify CheatDetect functionality:
+
+```java
+import com.cheatdetect.test.CheatDetectTester;
+
+public class TestApp {
+    public static void main(String[] args) {
+        new CheatDetectTester().setVisible(true);
+    }
+}
+```
+
+The tester provides real-time visibility into detections and allows easy verification of all monitoring features.
+
+## OS Support Notes
+
+- **Windows**: Full feature support with native process and window monitoring
+- **macOS**: Supported through AppleScript and native process monitoring
+- **Linux**: Support varies by desktop environment, full support on X11-based systems
 
 ## Contributing
 
